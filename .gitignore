@@ -1,0 +1,4 @@
+/mbox_example
+*.dylib
+*.o
+/test
