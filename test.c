@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
         LOG("PASS: opens existing mbox.\n");
     }
 
-    if (info.has_new) {
+    if (info.msg_new) {
         LOG("PASS: correctly determines that mbox has new messages.\n");
     } else {
         LOG("FAIL: does not detect new messages in the mbox.\n");

@@ -15,6 +15,7 @@ typedef enum state {
     MSG_START_MAYBE,
     MSG_START_MUST,
     MSG_HDR,
+    MSG_STATUS,
     MSG_BODY
 } state_t;
 
@@ -39,26 +40,21 @@ static int _get_next_line(const char *buf, unsigned int size, unsigned int *len)
     }
 }
 
-static unsigned char _is_from_line(const char *line, unsigned int len) {
-    return !strncmp(line, "From ", 5) ? 1 : 0;
-}
-
-static int _parse_line(const char *line, unsigned int len) {
+static int _parse_line(const char *line, unsigned int len, mbox_info_t *info) {
     static state_t st = MSG_START_MUST;
     switch (st) {
         case MSG_START_MUST:
         case MSG_START_MAYBE:
             if (!len) {
                 break;
-            } else if (len < 6) { /* F, R, O, M, space, and at least one more character */
+            } else if (len < 6) { /* not from line: F, R, O, M, space, and at
+                                     least one more character */
                 if (st == MSG_START_MAYBE) st = MSG_BODY;
                 return st == MSG_START_MUST ? 1 : 0;
             } else {
-                if (_is_from_line(line, len)) {
-#                           ifdef DEBUG
-                    fprintf(stdout, "Found message.\n");
-#                           endif
+                if (!strncmp(line, "From ", 5)) { /* message start */
                     st = MSG_HDR;
+                    info->msg_total++;
                 } else {
                     if (st == MSG_START_MAYBE) st = MSG_BODY;
                     return st == MSG_START_MUST ? 1 : 0;
@@ -66,8 +62,58 @@ static int _parse_line(const char *line, unsigned int len) {
             }
             break;
         case MSG_HDR:
+        case MSG_STATUS:
             if (!len) {
+                if (st == MSG_HDR) {
+                    /* no status found, this is a new message. */
+                    info->msg_new++;
+                }
                 st = MSG_BODY;
+            }
+            if (len > 8) { /* possibly status: S, T, A, T, U, S, :, space, and
+                              at least one more character. */
+                if (!strncmp(line, "Status: ", 8)) {
+                    if (st == MSG_STATUS) {
+                        fprintf(stderr, "Second status line while parsing header!");
+                        break;
+                    }
+                    st = MSG_STATUS;
+                    char msg_st[8]; /* max 7 status markers, but we only recon 2. */
+                    int msg_st_len = len-8;
+                    char msg_st_info = 0; /* this is how we're going to count the message as. */
+                    int i;
+                    assert(msg_st_len < 8);
+                    memcpy(msg_st, line+8, msg_st_len);
+                    msg_st[msg_st_len] = '\0';
+                    for (i=0; i < msg_st_len; i++) {
+                        switch (msg_st[i]) {
+                            case 'R':
+                                msg_st_info = 'R';
+                                break;
+                            case 'O':
+                                if (!msg_st_info) {
+                                    msg_st_info = 'O';
+                                }
+                                break;
+                            default:
+                                fprintf(stderr, "Unknown message status:"
+                                        " %c.\n", msg_st[i]);
+                                break;
+                        }
+                        if (msg_st_info == 'R') break;
+                    }
+                    switch (msg_st_info) {
+                        case 'R':
+                            info->msg_read++;
+                            break;
+                        case 'O':
+                            info->msg_seen++;
+                            break;
+                        default:
+                            fprintf(stderr, "The status is neither Seen or Read: %s.\n", msg_st);
+                            break;
+                    }
+                }
             }
             break;
         case MSG_BODY:
@@ -108,7 +154,7 @@ static int _mboxr_parse(const char *name, mbox_info_t *info) {
                 break;
             }
 
-            _parse_line((const char *)buf+off, len);
+            _parse_line((const char *)buf+off, len, info);
 
             off += len+1;
             len = 0;
@@ -120,7 +166,9 @@ static int _mboxr_parse(const char *name, mbox_info_t *info) {
             break;
         }
     }
+    assert(info->msg_total == info->msg_new+info->msg_seen+info->msg_read);
 #   ifdef DEBUG
+    fprintf(stdout, "Mailbox: %lu new, %lu seen, and %lu read.\n", info->msg_new, info->msg_seen, info->msg_read);
     fprintf(stdout, "Total number of lines: %d.\n", lc);
 #   endif
     return 0;
@@ -136,6 +184,8 @@ int mboxr_open(const char *name, mbox_info_t *info) {
     if (!S_ISREG(st.st_mode) || !(S_IRUSR & st.st_mode)) {
         return 1;
     }
+
+    memset(info, 0, sizeof(mbox_info_t));
 
     return _mboxr_parse(name, info);
 }
