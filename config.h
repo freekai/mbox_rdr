@@ -3,6 +3,6 @@
 
 #   define      DEBUG    1
 
-#   define      BUF_SIZE    2048
+#   define      BUF_SIZE    20480
 
 #endif /* _MBOX_RDR_CONFIG_H */
