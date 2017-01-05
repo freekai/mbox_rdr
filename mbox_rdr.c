@@ -127,9 +127,6 @@ static int _parse_line(const char *line, unsigned int len, mbox_info_t *info) {
 
 static int _mboxr_parse(const char *name, mbox_info_t *info) {
     char buf[BUF_SIZE];
-#   ifdef DEBUG
-    unsigned int lc = 0;
-#   endif
     int fd, bytes;
     unsigned int off, len, avail;
 
@@ -158,19 +155,12 @@ static int _mboxr_parse(const char *name, mbox_info_t *info) {
 
             off += len+1;
             len = 0;
-#           ifdef DEBUG
-            lc++;
-#           endif
         }
         if (!bytes) {
             break;
         }
     }
     assert(info->msg_total == info->msg_new+info->msg_seen+info->msg_read);
-#   ifdef DEBUG
-    fprintf(stdout, "Mailbox: %lu new, %lu seen, and %lu read.\n", info->msg_new, info->msg_seen, info->msg_read);
-    fprintf(stdout, "Total number of lines: %d.\n", lc);
-#   endif
     return 0;
 }
 

@@ -25,6 +25,9 @@ int main(int argc, char **argv) {
         LOG("PASS: opens existing mbox.\n");
     }
 
+    LOG("Mailbox: %lu new, %lu seen, and %lu read.\n",
+            info.msg_new, info.msg_seen, info.msg_read);
+
     if (info.msg_new) {
         LOG("PASS: correctly determines that mbox has new messages.\n");
     } else {
